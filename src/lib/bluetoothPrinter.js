@@ -292,8 +292,9 @@ export function generateRegistrationReceipt(registration) {
   // Date and time
   const now = new Date();
   const dateStr = `${now.getMonth()+1}/${now.getDate()}/${now.getFullYear()}`;
-  const timeStr = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
   text += `Date: ${dateStr}    Time: ${timeStr}\n`;
+
   
   // Footer
   text += `================================\n`;
