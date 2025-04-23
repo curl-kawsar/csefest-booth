@@ -163,7 +163,7 @@ export default function Home() {
               <span>ICT Quiz</span>
             </div>
           </div>
-          <p className="font-mono">Organized by Department of CSE, BAIUST | ©2023</p>
+          <p className="font-mono">Organized by Department of CSE, BAIUST | ©2025</p>
         </div>
       </div>
     </div>
