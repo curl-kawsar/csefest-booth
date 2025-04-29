@@ -97,4 +97,33 @@ export async function POST(request) {
       error: 'Failed to create registration. Please try again.' 
     }, { status: 500 });
   }
+}
+
+export async function DELETE(request) {
+  try {
+    const { registrationId, pin } = await request.json();
+    
+    if (!registrationId) {
+      return NextResponse.json({ error: 'Registration ID is required' }, { status: 400 });
+    }
+    
+    // Verify PIN
+    if (pin !== '5356') {
+      return NextResponse.json({ error: 'Invalid PIN' }, { status: 403 });
+    }
+    
+    await connectToDatabase();
+    
+    // Find and delete the registration
+    const registration = await Registration.findByIdAndDelete(registrationId);
+    
+    if (!registration) {
+      return NextResponse.json({ error: 'Registration not found' }, { status: 404 });
+    }
+    
+    return NextResponse.json({ message: 'Registration deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting registration:', error);
+    return NextResponse.json({ error: 'Failed to delete registration' }, { status: 500 });
+  }
 } 

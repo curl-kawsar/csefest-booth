@@ -7,6 +7,10 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [filter, setFilter] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePin, setDeletePin] = useState('');
+  const [deletingRegistration, setDeletingRegistration] = useState(null);
+  const [deletingLoading, setDeletingLoading] = useState(false);
   const registrationsPerPage = 10;
 
   const fetchRegistrations = async () => {
@@ -57,6 +61,45 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
     } catch (error) {
       console.error('Error printing receipt:', error);
       toast.error(`Failed to print receipt: ${error.message}`);
+    }
+  };
+
+  const handleDeleteClick = (registration) => {
+    setDeletingRegistration(registration);
+    setDeletePin('');
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingRegistration) return;
+    
+    try {
+      setDeletingLoading(true);
+      const response = await fetch('/api/registrations', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          registrationId: deletingRegistration._id,
+          pin: deletePin
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete registration');
+      }
+      
+      toast.success('Registration deleted successfully');
+      setShowDeleteModal(false);
+      fetchRegistrations(); // Refresh the list
+    } catch (error) {
+      console.error('Error deleting registration:', error);
+      toast.error(error.message);
+    } finally {
+      setDeletingLoading(false);
     }
   };
 
@@ -141,7 +184,7 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
                     <td className="px-4 py-3 font-mono">
                       {registration.eventId?.fee || 'N/A'}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 flex space-x-2">
                       <button
                         className={`bg-gradient-to-r from-purple-600 to-purple-700 text-white py-1 px-3 rounded-md text-sm flex items-center space-x-1 hover:from-purple-500 hover:to-purple-600 transition-colors duration-300 ${!bluetoothConnection?.server ? 'opacity-50 cursor-not-allowed' : ''}`}
                         onClick={() => handlePrintReceipt(registration)}
@@ -151,6 +194,16 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                         </svg>
                         <span>Print</span>
+                      </button>
+                      
+                      <button
+                        className="bg-gradient-to-r from-red-600 to-red-700 text-white py-1 px-3 rounded-md text-sm flex items-center space-x-1 hover:from-red-500 hover:to-red-600 transition-colors duration-300"
+                        onClick={() => handleDeleteClick(registration)}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        <span>Delete</span>
                       </button>
                     </td>
                   </tr>
@@ -204,6 +257,88 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
             Showing {currentRegistrations.length} out of {filteredRegistrations.length} registrations
           </div>
         </>
+      )}
+      
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-gray-800 border-2 border-red-500 rounded-xl p-6 max-w-md w-full m-4 shadow-2xl">
+            <div className="terminal-header mb-4">
+              <div className="terminal-title text-lg font-bold text-red-400">
+                <span className="text-white">$</span> sudo rm registration
+              </div>
+              <div className="terminal-dots">
+                <div className="terminal-dot dot-red"></div>
+                <div className="terminal-dot dot-yellow"></div>
+                <div className="terminal-dot dot-green"></div>
+              </div>
+            </div>
+            
+            <div className="mb-4 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-900 bg-opacity-30 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              
+              <h3 className="text-xl font-bold text-white mb-2">Confirm Deletion</h3>
+              <p className="text-gray-300 mb-2">
+                Are you sure you want to delete this registration?
+              </p>
+              
+              <div className="bg-gray-900 p-2 rounded mb-2 text-left">
+                <p className="text-yellow-400 font-mono text-sm">
+                  {deletingRegistration?.tokenNumber} | {deletingRegistration?.participantName}
+                </p>
+                <p className="text-green-400 font-mono text-sm">
+                  Event: {deletingRegistration?.eventId?.name}
+                </p>
+              </div>
+              
+              <div className="text-gray-300 text-sm mb-4">
+                This action cannot be undone.
+              </div>
+              
+              <div className="mb-4">
+                <label className="block text-gray-400 font-mono text-sm mb-2">
+                  Enter Security PIN to confirm:
+                </label>
+                <input 
+                  type="password"
+                  className="w-full bg-gray-900 border-2 border-gray-700 rounded-md p-2 text-gray-200 font-mono focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  placeholder="Security PIN"
+                  value={deletePin}
+                  onChange={(e) => setDeletePin(e.target.value)}
+                  maxLength={4}
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-between space-x-4">
+              <button
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2 px-4 rounded-md transition-colors duration-300"
+                onClick={() => setShowDeleteModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                className={`flex-1 bg-red-600 hover:bg-red-500 text-white py-2 px-4 rounded-md flex justify-center items-center transition-colors duration-300 ${deletingLoading ? 'opacity-70 cursor-not-allowed' : ''}`}
+                onClick={handleDeleteConfirm}
+                disabled={deletingLoading || deletePin.length !== 4}
+              >
+                {deletingLoading ? (
+                  <>
+                    <svg className="animate-spin h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processing...
+                  </>
+                ) : 'Delete Registration'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
