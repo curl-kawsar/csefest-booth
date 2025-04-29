@@ -11,6 +11,11 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
   const [deletePin, setDeletePin] = useState('');
   const [deletingRegistration, setDeletingRegistration] = useState(null);
   const [deletingLoading, setDeletingLoading] = useState(false);
+  const [dateFilter, setDateFilter] = useState('today');
+  const [customDateRange, setCustomDateRange] = useState({
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0]
+  });
   const registrationsPerPage = 10;
 
   const fetchRegistrations = async () => {
@@ -34,14 +39,66 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
     fetchRegistrations();
   }, [refreshTrigger]);
 
-  // Filter registrations based on search input
-  const filteredRegistrations = registrations.filter(reg => 
+  // Apply date filtering
+  const getFilteredByDate = (regs) => {
+    return regs.filter(reg => {
+      const regDate = new Date(reg.createdAt);
+      
+      if (dateFilter === 'today') {
+        const today = new Date();
+        return regDate.toDateString() === today.toDateString();
+      } 
+      else if (dateFilter === 'yesterday') {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        return regDate.toDateString() === yesterday.toDateString();
+      } 
+      else if (dateFilter === 'thisWeek') {
+        const today = new Date();
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - today.getDay());
+        return regDate >= weekStart;
+      } 
+      else if (dateFilter === 'thisMonth') {
+        const today = new Date();
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        return regDate >= monthStart;
+      } 
+      else if (dateFilter === 'custom') {
+        const startDate = new Date(customDateRange.startDate);
+        startDate.setHours(0, 0, 0, 0);
+        
+        const endDate = new Date(customDateRange.endDate);
+        endDate.setHours(23, 59, 59, 999);
+        
+        return regDate >= startDate && regDate <= endDate;
+      } 
+      else {
+        return true; // 'all' option
+      }
+    });
+  };
+
+  // Filter registrations based on search input AND date filter
+  const filteredRegistrations = getFilteredByDate(registrations).filter(reg => 
     reg.participantName.toLowerCase().includes(filter.toLowerCase()) ||
     reg.email.toLowerCase().includes(filter.toLowerCase()) ||
     reg.phone.includes(filter) ||
     reg.tokenNumber.toLowerCase().includes(filter.toLowerCase()) ||
     (reg.eventId && reg.eventId.name.toLowerCase().includes(filter.toLowerCase()))
   );
+
+  // Format date for display
+  const formatDate = (dateString) => {
+    const options = { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
 
   // Pagination logic
   const indexOfLastRegistration = currentPage * registrationsPerPage;
@@ -116,19 +173,78 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
         </div>
       </div>
       
-      <div className="mb-6 relative">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="col-span-2 relative">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            placeholder="grep -i 'search by name, email, token, event...'"
+            className="w-full bg-gray-800 border-2 border-gray-700 rounded-md p-3 pl-10 text-gray-200 font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
         </div>
-        <input
-          type="text"
-          placeholder="grep -i 'search by name, email, token, event...'"
-          className="w-full bg-gray-800 border-2 border-gray-700 rounded-md p-3 pl-10 text-gray-200 font-mono focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        />
+        
+        <div>
+          <select 
+            className="w-full bg-gray-800 border-2 border-gray-700 rounded-md p-3 text-gray-200 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-300"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+          >
+            <option value="today">Today's Registrations</option>
+            <option value="yesterday">Yesterday</option>
+            <option value="thisWeek">This Week</option>
+            <option value="thisMonth">This Month</option>
+            <option value="custom">Custom Date Range</option>
+            <option value="all">All Time</option>
+          </select>
+        </div>
+      </div>
+      
+      {/* Custom date range selector */}
+      {dateFilter === 'custom' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <div>
+            <label className="block text-gray-400 font-mono text-sm mb-2">
+              Start Date:
+            </label>
+            <input 
+              type="date"
+              className="w-full bg-gray-900 border-2 border-gray-700 rounded-md p-2 text-gray-200 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={customDateRange.startDate}
+              onChange={(e) => setCustomDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="block text-gray-400 font-mono text-sm mb-2">
+              End Date:
+            </label>
+            <input 
+              type="date"
+              className="w-full bg-gray-900 border-2 border-gray-700 rounded-md p-2 text-gray-200 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              value={customDateRange.endDate}
+              onChange={(e) => setCustomDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+            />
+          </div>
+        </div>
+      )}
+      
+      {/* Date filter summary */}
+      <div className="mb-4 text-center">
+        <span className="inline-block bg-gray-800 rounded-full px-4 py-1 text-sm font-mono text-blue-400 border border-blue-800">
+          {dateFilter === 'today' && 'Showing today\'s registrations'}
+          {dateFilter === 'yesterday' && 'Showing yesterday\'s registrations'}
+          {dateFilter === 'thisWeek' && 'Showing this week\'s registrations'}
+          {dateFilter === 'thisMonth' && 'Showing this month\'s registrations'}
+          {dateFilter === 'custom' && `Showing registrations from ${customDateRange.startDate} to ${customDateRange.endDate}`}
+          {dateFilter === 'all' && 'Showing all registrations'}
+          {' • '}
+          <span className="text-green-400">{filteredRegistrations.length}</span> records found
+        </span>
       </div>
       
       {loading ? (
@@ -142,9 +258,9 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
             <div className="mt-2 text-gray-500 font-mono text-sm">SELECT * FROM registrations;</div>
           </div>
         </div>
-      ) : registrations.length === 0 ? (
+      ) : filteredRegistrations.length === 0 ? (
         <div className="terminal p-6 text-center">
-          <p className="text-yellow-500 font-mono mb-2">No records found in database</p>
+          <p className="text-yellow-500 font-mono mb-2">No records found for this date range</p>
           <p className="text-gray-500 font-mono text-sm">0 rows returned</p>
         </div>
       ) : (
@@ -156,6 +272,7 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
                   <th className="px-4 py-3 border-b border-gray-700"># TOKEN</th>
                   <th className="px-4 py-3 border-b border-gray-700">PARTICIPANT</th>
                   <th className="px-4 py-3 border-b border-gray-700">EVENT</th>
+                  <th className="px-4 py-3 border-b border-gray-700">DATE</th>
                   <th className="px-4 py-3 border-b border-gray-700">FEE (BDT)</th>
                   <th className="px-4 py-3 border-b border-gray-700">ACTIONS</th>
                 </tr>
@@ -180,6 +297,9 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
                     </td>
                     <td className="px-4 py-3 font-mono text-green-400">
                       {registration.eventId?.name || 'Unknown'}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-gray-400">
+                      {formatDate(registration.createdAt)}
                     </td>
                     <td className="px-4 py-3 font-mono">
                       {registration.eventId?.fee || 'N/A'}

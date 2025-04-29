@@ -4,11 +4,23 @@ import { toast } from 'sonner';
 const FinanceSummary = ({ refreshTrigger }) => {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [dateFilter, setDateFilter] = useState('today');
+  const [customDateRange, setCustomDateRange] = useState({
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0]
+  });
 
   const fetchSummary = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/finance');
+      
+      // Build query string for date filtering
+      let queryParams = `?dateFilter=${dateFilter}`;
+      if (dateFilter === 'custom') {
+        queryParams += `&startDate=${customDateRange.startDate}&endDate=${customDateRange.endDate}`;
+      }
+      
+      const response = await fetch(`/api/finance${queryParams}`);
       if (!response.ok) {
         throw new Error('Failed to fetch finance summary');
       }
@@ -24,11 +36,28 @@ const FinanceSummary = ({ refreshTrigger }) => {
 
   useEffect(() => {
     fetchSummary();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, dateFilter, customDateRange]);
 
   // Function to get random decimal numbers for visualization
   const getRandomValues = () => {
     return Array.from({ length: 20 }, () => Math.floor(Math.random() * 9) + 1);
+  };
+  
+  const getDateRangeLabel = () => {
+    switch (dateFilter) {
+      case 'today':
+        return "Today's Revenue";
+      case 'yesterday':
+        return "Yesterday's Revenue";
+      case 'thisWeek':
+        return "This Week's Revenue";
+      case 'thisMonth':
+        return "This Month's Revenue";
+      case 'custom':
+        return `Revenue from ${customDateRange.startDate} to ${customDateRange.endDate}`;
+      default:
+        return "All-Time Revenue";
+    }
   };
 
   return (
@@ -44,6 +73,50 @@ const FinanceSummary = ({ refreshTrigger }) => {
         </div>
       </div>
       
+      {/* Date filter controls */}
+      <div className="mb-6">
+        <select 
+          className="w-full bg-gray-800 border-2 border-gray-700 rounded-md p-3 text-gray-200 font-mono focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-300"
+          value={dateFilter}
+          onChange={(e) => setDateFilter(e.target.value)}
+        >
+          <option value="today">Today's Revenue</option>
+          <option value="yesterday">Yesterday's Revenue</option>
+          <option value="thisWeek">This Week's Revenue</option>
+          <option value="thisMonth">This Month's Revenue</option>
+          <option value="custom">Custom Date Range</option>
+          <option value="all">All-Time Revenue</option>
+        </select>
+      </div>
+      
+      {/* Custom date range selector */}
+      {dateFilter === 'custom' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-gray-800 p-4 rounded-lg border border-gray-700">
+          <div>
+            <label className="block text-gray-400 font-mono text-sm mb-2">
+              Start Date:
+            </label>
+            <input 
+              type="date"
+              className="w-full bg-gray-900 border-2 border-gray-700 rounded-md p-2 text-gray-200 font-mono focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              value={customDateRange.startDate}
+              onChange={(e) => setCustomDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="block text-gray-400 font-mono text-sm mb-2">
+              End Date:
+            </label>
+            <input 
+              type="date"
+              className="w-full bg-gray-900 border-2 border-gray-700 rounded-md p-2 text-gray-200 font-mono focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              value={customDateRange.endDate}
+              onChange={(e) => setCustomDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+            />
+          </div>
+        </div>
+      )}
+      
       {loading ? (
         <div className="py-20">
           <div className="flex flex-col items-center justify-center">
@@ -55,13 +128,20 @@ const FinanceSummary = ({ refreshTrigger }) => {
             <div className="mt-2 text-gray-500 font-mono text-sm">SELECT SUM(fee) FROM registrations GROUP BY event_id;</div>
           </div>
         </div>
-      ) : !summary ? (
+      ) : !summary || summary.totalRegistrations === 0 ? (
         <div className="terminal p-6 text-center">
-          <p className="text-yellow-500 font-mono mb-2">No financial data available</p>
+          <p className="text-yellow-500 font-mono mb-2">No financial data available for this period</p>
           <p className="text-gray-500 font-mono text-sm">0 rows returned</p>
         </div>
       ) : (
         <div>
+          {/* Date range indicator */}
+          <div className="mb-4 text-center">
+            <span className="inline-block bg-gray-800 rounded-full px-4 py-1 text-sm font-mono text-green-400 border border-green-800">
+              {getDateRangeLabel()}
+            </span>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div className="bg-gray-800 bg-opacity-90 p-5 rounded-lg border border-gray-700 relative overflow-hidden group hover:border-green-500 transition-colors duration-300">
               <div className="relative z-10">
@@ -81,7 +161,7 @@ const FinanceSummary = ({ refreshTrigger }) => {
               <div className="relative z-10">
                 <div className="text-gray-400 font-mono text-sm mb-1">TOTAL REVENUE</div>
                 <div className="text-3xl font-bold font-mono text-green-400 mb-2">{summary.totalAmount} <span className="text-lg">BDT</span></div>
-                <div className="text-gray-500 font-mono text-xs">Collected from all events</div>
+                <div className="text-gray-500 font-mono text-xs">Collected from events</div>
               </div>
               {/* Abstract digital pattern in background */}
               <div className="absolute bottom-0 right-0 opacity-10 text-[8px] font-mono text-green-500 overflow-hidden w-full h-full flex flex-wrap content-end justify-end p-2">
