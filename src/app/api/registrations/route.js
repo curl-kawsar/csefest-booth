@@ -2,21 +2,39 @@ import { NextResponse } from 'next/server';
 import connectToDatabase from '@/lib/db';
 import { Registration, Event } from '@/lib/models/eventModel';
 
-// Simple counter-based token function
+// Improved token generation function
 async function generateUniqueToken() {
   try {
-    // Get the total count of registrations and add 1
-    const count = await Registration.countDocuments();
-    const newCount = count + 1;
+    // Find the highest token number
+    const latestRegistration = await Registration.findOne({}, { tokenNumber: 1 })
+      .sort({ tokenNumber: -1 });
     
-    // Format as CF-#### with leading zeros
-    return `CF-${newCount.toString().padStart(4, '0')}`;
+    if (latestRegistration && latestRegistration.tokenNumber) {
+      // Extract the numeric part of the last token (CF-####)
+      const lastTokenNumber = latestRegistration.tokenNumber;
+      const numericPart = parseInt(lastTokenNumber.split('-')[1]);
+      
+      // Increment the number and format
+      const newNumber = numericPart + 1;
+      return `CF-${newNumber.toString().padStart(4, '0')}`;
+    } else {
+      // No registrations exist, start from 1
+      return 'CF-0001';
+    }
   } catch (error) {
     console.error('Error generating token:', error);
-    // If we can't get a count, use timestamp as fallback
+    // Fallback to timestamp-based token
     const timestamp = Date.now();
     return `CF-${timestamp.toString().slice(-4)}`;
   }
+}
+
+// Fallback token function
+async function generateFallbackToken() {
+  // Use current time + random number to ensure uniqueness
+  const timestamp = Date.now();
+  const random = Math.floor(Math.random() * 1000);
+  return `CF-${timestamp.toString().slice(-4)}${random.toString().padStart(3, '0')}`;
 }
 
 export async function GET(request) {
@@ -61,36 +79,48 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
     
-    // Generate token based on registration count (guaranteed to be unique)
-    const tokenNumber = await generateUniqueToken();
+    // Generate token based on the highest token number
+    let tokenNumber = await generateUniqueToken();
+    let retries = 0;
+    const MAX_RETRIES = 3;
     
-    try {
-      // Create the registration record
-      const registration = await Registration.create({
-        eventId,
-        participantName,
-        email,
-        phone,
-        institutionName: institutionName || '',
-        tokenNumber,
-        paid: true
-      });
-      
-      // Populate event details in response
-      await registration.populate('eventId');
-      
-      return NextResponse.json(registration, { status: 201 });
-    } catch (err) {
-      console.error('Registration creation error:', err);
-      
-      if (err.code === 11000) {
-        return NextResponse.json({ 
-          error: 'Database conflict - Please try again' 
-        }, { status: 409 });
+    while (retries < MAX_RETRIES) {
+      try {
+        // Create the registration record
+        const registration = await Registration.create({
+          eventId,
+          participantName,
+          email,
+          phone,
+          institutionName: institutionName || '',
+          tokenNumber,
+          paid: true
+        });
+        
+        // Populate event details in response
+        await registration.populate('eventId');
+        
+        return NextResponse.json(registration, { status: 201 });
+      } catch (err) {
+        // If duplicate key error
+        if (err.code === 11000) {
+          console.log(`Token conflict with ${tokenNumber}, retrying...`);
+          retries++;
+          
+          // Switch to fallback token generation on retry
+          tokenNumber = await generateFallbackToken();
+          continue;
+        }
+        
+        throw err;
       }
-      
-      throw err;
     }
+    
+    // If we've reached here, all retries failed
+    return NextResponse.json({ 
+      error: 'Couldn\'t generate a unique token after multiple attempts. Please try again later.' 
+    }, { status: 500 });
+    
   } catch (error) {
     console.error('Error creating registration:', error);
     return NextResponse.json({ 
