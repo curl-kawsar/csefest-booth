@@ -16,6 +16,7 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
     startDate: new Date().toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0]
   });
+  const [smsSendingMap, setSmsSendingMap] = useState({});
   const registrationsPerPage = 10;
 
   const fetchRegistrations = async () => {
@@ -118,6 +119,48 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
     } catch (error) {
       console.error('Error printing receipt:', error);
       toast.error(`Failed to print receipt: ${error.message}`);
+    }
+  };
+
+  const handleSendSms = async (registration) => {
+    if (!registration.phone) {
+      toast.error('No phone number available for this participant');
+      return;
+    }
+
+    // Update loading state for this specific registration
+    setSmsSendingMap(prev => ({ ...prev, [registration._id]: true }));
+    
+    try {
+      const eventName = registration.eventId?.name || 'Unknown Event';
+      
+      // Prepare SMS message
+      const message = `Dear ${registration.participantName},\nYour Registration is incomplete in BAIUST CSE Fest 2025 in this ${eventName}. Your Token is ${registration.tokenNumber}.\nPlease Complete Your Registration from here https://csefest.baiust.ac.bd.\nDuring Registration Please Use your Token Number`;
+      
+      // Send SMS API request
+      const response = await fetch('/api/sms/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          phone: registration.phone,
+          message: message,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send SMS');
+      }
+      
+      toast.success(`SMS sent to ${registration.participantName}!`);
+    } catch (error) {
+      console.error('Error sending SMS:', error);
+      toast.error(`Failed to send SMS: ${error.message}`);
+    } finally {
+      setSmsSendingMap(prev => ({ ...prev, [registration._id]: false }));
     }
   };
 
@@ -315,6 +358,17 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                         </svg>
                         <span>Print</span>
+                      </button>
+                      
+                      <button
+                        className={`bg-gradient-to-r from-blue-600 to-blue-700 text-white py-1 px-3 rounded-md text-sm flex items-center space-x-1 hover:from-blue-500 hover:to-blue-600 transition-colors duration-300 ${smsSendingMap[registration._id] ? 'opacity-70 cursor-not-allowed' : ''}`}
+                        onClick={() => handleSendSms(registration)}
+                        disabled={smsSendingMap[registration._id]}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                        </svg>
+                        <span>{smsSendingMap[registration._id] ? 'Sending...' : 'SMS'}</span>
                       </button>
                       
                       <button
