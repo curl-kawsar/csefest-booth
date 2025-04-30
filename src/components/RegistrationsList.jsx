@@ -293,6 +293,7 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
                       <div>
                         <div className="font-medium text-blue-400">{registration.participantName}</div>
                         <div className="text-xs text-gray-400 mt-1">{registration.email}</div>
+                        <div className="text-xs text-gray-400 mt-1">Phone: {registration.phone}</div>
                       </div>
                     </td>
                     <td className="px-4 py-3 font-mono text-green-400">
