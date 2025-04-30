@@ -135,7 +135,7 @@ const RegistrationsList = ({ bluetoothConnection, refreshTrigger }) => {
       const eventName = registration.eventId?.name || 'Unknown Event';
       
       // Prepare SMS message
-      const message = `Dear ${registration.participantName},\nYour Registration is incomplete in BAIUST CSE Fest 2025 in this ${eventName}. Your Token is ${registration.tokenNumber}.\nPlease Complete Your Registration from here https://csefest.baiust.ac.bd.\nDuring Registration Please Use your Token Number`;
+      const message = `Dear ${registration.participantName},\nYour Registration is incomplete in BAIUST CSE Fest 2025 in this ${eventName}. Your Token is ${registration.tokenNumber}.\nPlease Complete Your Registration from here https://csefest.baiust.ac.bd.\nDuring Registration Please Use your Token Number. If You See any Issue then Don't hesitate to message us. Contact us on: https://www.facebook.com/csefest2025`;
       
       // Send SMS API request
       const response = await fetch('/api/sms/send', {
